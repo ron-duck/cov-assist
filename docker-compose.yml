@@ -1,0 +1,37 @@
+services:
+  core:
+    build:
+      context: ./core
+    environment:
+      - CORE_PORT=${CORE_PORT:-8000}
+      - COVERITY_BASE_URL=${COVERITY_BASE_URL}
+      - COVERITY_USERNAME=${COVERITY_USERNAME}
+      - COVERITY_PASSWORD=${COVERITY_PASSWORD}
+      - COVERITY_TLS_VERIFY=${COVERITY_TLS_VERIFY:-true}
+      - COVERITY_CA_BUNDLE=${COVERITY_CA_BUNDLE}
+      - MAX_LIMIT=${MAX_LIMIT:-200}
+      - MAX_LOOKBACK_DAYS=${MAX_LOOKBACK_DAYS:-365}
+      - HTTP_TIMEOUT_SECONDS=${HTTP_TIMEOUT_SECONDS:-10}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks: [coverity_net]
+    expose:
+      - "8000"
+
+  gateway:
+    build:
+      context: ./gateway
+    environment:
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_API_KEYS=${GATEWAY_API_KEYS}
+      - GATEWAY_KEY_POLICY_JSON=${GATEWAY_KEY_POLICY_JSON:-{}}
+      - CORE_BASE_URL=${CORE_BASE_URL:-http://core:8000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - core
+    networks: [coverity_net]
+
+networks:
+  coverity_net:
+    driver: bridge
