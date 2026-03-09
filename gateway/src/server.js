@@ -6,7 +6,12 @@ import { request } from "undici";
 import { config } from "./config.js";
 import { requireApiKey, enforceStreamPolicy } from "./auth.js";
 import { auditLog } from "./audit.js";
-import { IssuesTopSchema, IssuesCountSchema, normalizeStreamName } from "./validate.js";
+import {
+  IssuesTopSchema,
+  IssuesCountSchema,
+  IssuesSearchSchema,
+  normalizeStreamName
+} from "./validate.js";
 
 const app = Fastify({ logger: { level: config.logLevel } });
 
@@ -129,6 +134,35 @@ app.post("/issues/count", { preHandler: requireApiKey }, async (req, reply) => {
     auditAction: "issues_count",
     auditMeta: {
       stream,
+      impact: payload.impact,
+      status: payload.status
+    }
+  });
+});
+
+app.post("/issues/search", { preHandler: requireApiKey }, async (req, reply) => {
+  const parsed = IssuesSearchSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    reply.code(400).send({ ok: false, error: "Invalid request", details: parsed.error.flatten() });
+    return;
+  }
+
+  const payload = parsed.data;
+  const stream = normalizeStreamName(payload.stream);
+
+  if (!enforceStreamPolicy(req, reply, stream)) return;
+
+  const url = `${config.coreBaseUrl}/issues/search`;
+
+  await proxyToCore(req, reply, {
+    method: "POST",
+    url,
+    body: { ...payload, stream },
+    auditAction: "issues_search",
+    auditMeta: {
+      stream,
+      limit: payload.limit,
+      offset: payload.offset,
       impact: payload.impact,
       status: payload.status
     }

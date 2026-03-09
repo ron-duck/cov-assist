@@ -71,6 +71,29 @@ class CoverityClient:
         self._issues_columns_cache = mapping
         return mapping
 
+    async def resolve_issue_columns(
+    self,
+    preferred_columns: list[str] | None = None,
+    ) -> list[str] | None:
+        cols_map = await self.issues_columns()
+
+        if preferred_columns is None:
+            preferred_columns = [
+                "cid",
+                "checker",
+                "impact",
+                "status",
+                "displayImpact",
+                "displayType",
+                "displayFile",
+                "displayFunction",
+                "displayFirstDetected",
+                "displayLastDetected",
+            ]
+
+        requested = [c for c in preferred_columns if c in cols_map]
+        return requested if requested else None
+
     async def issues_search(
         self,
         *,
@@ -172,27 +195,7 @@ class CoverityClient:
         preferred_columns: list[str] | None = None,
     ) -> TableResult:
         # Resolve columns safely: only request columns that exist for Issues view.
-        cols_map = await self.issues_columns()
-
-        if preferred_columns is None:
-            # Conservative defaults; will be intersected with actual available keys
-            preferred_columns = [
-                "cid",
-                "checker",
-                "impact",
-                "status",
-                "displayImpact",
-                "displayType",
-                "displayFile",
-                "displayFunction",
-                "displayFirstDetected",
-                "displayLastDetected",
-            ]
-
-        requested = [c for c in preferred_columns if c in cols_map]
-        # If none match, let server return default columns.
-        fallback = list(cols_map.keys())[:20]
-        cols = requested if requested else None
+        cols = await self.resolve_issue_columns(preferred_columns)       
 
         return await self.issues_search(
             stream=stream,

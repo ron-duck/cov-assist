@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional, List, Dict, Any
+from typing import Literal
 
 Impact = Literal["Audit","Low", "Medium", "High"]
 IssueStatus = Literal["Fixed", "Dismissed", "Triaged", "New"]
@@ -46,3 +46,17 @@ class IssuesCountResponse(BaseModel):
     count: int
     filters: AppliedIssueFilters
 
+class IssuesSearchRequest(BaseModel):
+    stream: str = Field(..., min_length=1)
+    status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
+    impact: list[Impact] = Field(default_factory=lambda: ["High"])
+    limit: int = Field(default=20, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+class IssuesSearchResponse(BaseModel):
+    stream: str
+    limit: int
+    total_available: int
+    total_returned: int
+    filters: AppliedIssueFilters
+    issues: list[IssueSummary]
