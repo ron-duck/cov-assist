@@ -16,12 +16,68 @@ await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
 
 app.get("/health", async () => ({ ok: true, service: "gateway", version: "0.1.0" }));
 
+function isTimeoutError(err) {
+  return err?.name === "HeadersTimeoutError"
+    || err?.name === "BodyTimeoutError"
+    || err?.code === "UND_ERR_HEADERS_TIMEOUT"
+    || err?.code === "UND_ERR_BODY_TIMEOUT"
+    || err?.code === "ETIMEDOUT";
+}
+
+async function proxyToCore(req, reply, { method, url, body, auditAction, auditMeta = {} }) {
+  try {
+    const res = await request(url, {
+      method,
+      headers: body ? { "content-type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    const responseBody = await res.body
+      .json()
+      .catch(() => ({ ok: false, error: "Upstream returned non-JSON" }));
+
+    auditLog(req, auditAction, {
+      ...auditMeta,
+      statusCode: res.statusCode
+    });
+
+    reply.code(res.statusCode).send(responseBody);
+  } catch (err) {
+    const statusCode = isTimeoutError(err) ? 504 : 502;
+
+    req.log.error(
+      {
+        err,
+        upstream: url,
+        method,
+        auditAction
+      },
+      "core_request_failed"
+    );
+
+    auditLog(req, auditAction, {
+      ...auditMeta,
+      statusCode,
+      upstreamError: err?.code || err?.name || "UNKNOWN"
+    });
+
+    reply.code(statusCode).send({
+      ok: false,
+      error: statusCode === 504
+        ? "Core service timed out"
+        : "Failed to reach core service"
+    });
+  }
+}
+
 app.get("/streams", { preHandler: requireApiKey }, async (req, reply) => {
   const url = `${config.coreBaseUrl}/streams`;
-  const res = await request(url, { method: "GET" });
-  const body = await res.body.json();
-  auditLog(req, "streams_list", { statusCode: res.statusCode });
-  reply.code(res.statusCode).send(body);
+
+  await proxyToCore(req, reply, {
+    method: "GET",
+    url,
+    auditAction: "streams_list"
+  });
 });
 
 app.post("/issues/top", { preHandler: requireApiKey }, async (req, reply) => {
@@ -37,23 +93,19 @@ app.post("/issues/top", { preHandler: requireApiKey }, async (req, reply) => {
   if (!enforceStreamPolicy(req, reply, stream)) return;
 
   const url = `${config.coreBaseUrl}/issues/top`;
-  const res = await request(url, {
+
+  await proxyToCore(req, reply, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...payload, stream })
+    url,
+    body: { ...payload, stream },
+    auditAction: "issues_top",
+    auditMeta: {
+      stream,
+      limit: payload.limit,
+      impact: payload.impact,
+      status: payload.status
+    }
   });
-
-  const body = await res.body.json().catch(() => ({ ok: false, error: "Upstream returned non-JSON" }));
-  auditLog(req, "issues_top", {
-    stream,
-    statusCode: res.statusCode,
-    limit: payload.limit,
-    impact: payload.impact,
-    status: payload.status,
-    returned: body?.total_returned
-  });
-
-  reply.code(res.statusCode).send(body);
 });
 
 app.post("/issues/count", { preHandler: requireApiKey }, async (req, reply) => {
@@ -69,22 +121,18 @@ app.post("/issues/count", { preHandler: requireApiKey }, async (req, reply) => {
   if (!enforceStreamPolicy(req, reply, stream)) return;
 
   const url = `${config.coreBaseUrl}/issues/count`;
-  const res = await request(url, {
+
+  await proxyToCore(req, reply, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...payload, stream })
+    url,
+    body: { ...payload, stream },
+    auditAction: "issues_count",
+    auditMeta: {
+      stream,
+      impact: payload.impact,
+      status: payload.status
+    }
   });
-
-  const body = await res.body.json().catch(() => ({ ok: false, error: "Upstream returned non-JSON" }));
-  auditLog(req, "issues_count", {
-    stream,
-    statusCode: res.statusCode,
-    impact: payload.impact,
-    status: payload.status,
-    count: body?.count
-  });
-
-  reply.code(res.statusCode).send(body);
 });
 
 app.listen({ host: "0.0.0.0", port: config.port });
