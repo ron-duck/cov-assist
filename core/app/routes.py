@@ -1,6 +1,5 @@
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from typing import Optional
 from .models import (
     StreamsListResponse,
     IssuesTopRequest,

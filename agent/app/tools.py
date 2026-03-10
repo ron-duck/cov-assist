@@ -8,6 +8,11 @@ from .config import settings
 
 class GatewayTools:
     def __init__(self) -> None:
+        limits = httpx.Limits(
+            max_connections=20,
+            max_keepalive_connections=10,
+        )
+        
         self._client = httpx.AsyncClient(
             base_url=settings.gateway_base_url.rstrip("/"),
             timeout=30.0,
