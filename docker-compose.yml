@@ -32,6 +32,27 @@ services:
       - core
     networks: [coverity_net]
 
+
+  agent:
+    build:
+      context: ./agent
+    environment:
+      - AGENT_PORT=${AGENT_PORT:-8090}
+      - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
+      - GATEWAY_BASE_URL=${GATEWAY_BASE_URL:-http://gateway:8080}
+      - AGENT_GATEWAY_API_KEY=${AGENT_GATEWAY_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-60}
+      - LLM_MAX_TOOL_ROUND_TRIPS=${LLM_MAX_TOOL_ROUND_TRIPS:-6}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0}
+    ports:
+      - "${AGENT_PORT:-8090}:8090"
+    depends_on:
+      - gateway
+    networks: [coverity_net]
+
 networks:
   coverity_net:
     driver: bridge

@@ -1,35 +1,35 @@
-# Coverity Assistant (Python core + Node gateway)
+# Coverity Assistant
 
-Internal-only, security-first setup:
-- `core/` Python service that talks to Coverity Connect (read-only)
+Three-service layout:
+- `core/` Python service that talks to Coverity Connect
 - `gateway/` Node.js gateway that enforces auth, rate limits, audit logs, and forwards to core
-- `docker-compose.yml` runs both on an internal host near Coverity
+- `agent/` Python NLQ agent that uses an LLM plus the gateway tools
 
-## Quick start (internal VM)
-1) Copy `.env.example` to `.env` and fill in values.
-2) Generate a strong gateway API key:
-   - `python tools/gen_apikey.py`
-3) Start:
+## Quick start
+1. Copy `.env.example` to `.env` and fill in values.
+2. Generate a strong gateway API key with `python tools/gen_apikey.py`.
+3. Set `AGENT_GATEWAY_API_KEY` to one of the values in `GATEWAY_API_KEYS`.
+4. Configure the LLM settings:
+   - `LLM_BASE_URL`
+   - `LLM_MODEL`
+   - `LLM_API_KEY` if your provider requires one
+5. Start the stack:
    - `docker compose up -d --build`
-4) Open:
-   - Gateway health: `http://localhost:8080/health`
-   - Core health: `http://localhost:8000/health`
 
-## Security posture (high level)
-- Gateway requires `X-API-Key`
-- Per-key stream allow-list enforced at gateway (configurable)
-- Rate limiting at gateway
-- Core uses TLS verification by default (explicit opt-out available)
-- No “dummy” fallback data anywhere
-- Strict request validation and hard caps on limit/lookback
-- Audit logs (who/what/when/result_count), no secrets
+## Endpoints
+- Gateway health: `http://localhost:8080/health`
+- Agent health: `http://localhost:8090/health`
+- Agent ask: `POST http://localhost:8090/ask`
 
-## What you implement next
-- Wire real Coverity endpoints in `core/app/coverity_client.py`
-- Add additional semantic routes in `core/app/routes.py`
-- (Optional) Add an MCP transport layer later; keep semantics in core unchanged
+Example:
 
+```bash
+curl -X POST http://localhost:8090/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What high impact new issues exist in pygoat-master?"}'
+```
 
-## Notes for your Coverity instance
-- Set `COVERITY_BASE_URL` to include `/api/v2` (from your OpenAPI `servers.url`).
-- This API uses **HTTP Basic Auth**.
+## Notes
+- `core` stays internal-only.
+- The agent calls the gateway, not core directly.
+- The agent expects an OpenAI-compatible chat completions endpoint at `LLM_BASE_URL`.

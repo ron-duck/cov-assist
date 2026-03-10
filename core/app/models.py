@@ -1,21 +1,25 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, Optional
 
 Impact = Literal["Audit","Low", "Medium", "High"]
 IssueStatus = Literal["Fixed", "Dismissed", "Triaged", "New"]
 
 class AppliedIssueFilters(BaseModel):
-    impact: list[Impact]
-    status: list[IssueStatus]
+    impact: Optional[list[Impact]] = None
+    status: Optional[list[IssueStatus]] = None
+#    impact: list[Impact]
+#    status: list[IssueStatus]
 
 class StreamsListResponse(BaseModel):
     streams: list[str]
 
 class IssuesTopRequest(BaseModel):
     stream: str = Field(..., min_length=1)
-    status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
-    impact: list[Impact] = Field(default_factory=lambda: ["High"])
+    status: Optional[list[IssueStatus]] = None
+    impact: Optional[list[Impact]] = None
     limit: int = Field(default=20, ge=1, le=200)
+#    status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
+#    impact: list[Impact] = Field(default_factory=lambda: ["High"])
 
 class IssueSummary(BaseModel):
     cid: str | None = None
@@ -38,8 +42,10 @@ class IssuesTopResponse(BaseModel):
 
 class IssuesCountRequest(BaseModel):
     stream: str = Field(..., min_length=1)
-    status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
-    impact: list[Impact] = Field(default_factory=lambda: ["High"])
+    status: Optional[list[IssueStatus]] = None
+    impact: Optional[list[Impact]] = None
+    #status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
+    #impact: list[Impact] = Field(default_factory=lambda: ["High"])
 
 class IssuesCountResponse(BaseModel):
     stream: str
@@ -48,8 +54,10 @@ class IssuesCountResponse(BaseModel):
 
 class IssuesSearchRequest(BaseModel):
     stream: str = Field(..., min_length=1)
-    status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
-    impact: list[Impact] = Field(default_factory=lambda: ["High"])
+    status: Optional[list[IssueStatus]] = None
+    impact: Optional[list[Impact]] = None    
+    #status: list[IssueStatus] = Field(default_factory=lambda: ["New"])
+    #impact: list[Impact] = Field(default_factory=lambda: ["High"])
     limit: int = Field(default=20, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 

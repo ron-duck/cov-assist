@@ -98,8 +98,8 @@ class CoverityClient:
         self,
         *,
         stream: str,
-        impact: list[str],
-        status: list[str],
+        impact: list[str] | None,
+        status: list[str] | None,
         limit: int,
         offset: int = 0,
         columns: list[str] | None = None,
@@ -168,8 +168,8 @@ class CoverityClient:
         self,
         *,
         stream: str,
-        impact: list[str],
-        status: list[str],
+        impact: list[str] | None,
+        status: list[str] | None,
     ) -> dict[str, Any]:
         table = await self.issues_search(
         stream=stream,
@@ -189,8 +189,8 @@ class CoverityClient:
         self,
         *,
         stream: str,
-        impact: list[str],
-        status: list[str],
+        impact: list[str] | None,
+        status: list[str] | None,
         limit: int,
         preferred_columns: list[str] | None = None,
     ) -> TableResult:
