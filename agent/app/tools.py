@@ -1,10 +1,45 @@
 import json
-from typing import Any
+from typing import Any, Literal
 
 import httpx
+from pydantic import BaseModel, Field
 
 from .config import settings
 
+IssueStatus = Literal["Fixed", "Dismissed", "Triaged", "New"]
+Impact = Literal["Audit","Low", "Medium", "High"]
+
+class ListStreamsArgs(BaseModel):
+    model_config = {
+        "extra": "forbid",
+    }
+
+class SearchIssuesArgs(BaseModel):
+    stream: str = Field(..., min_length=1)
+    status: list[IssueStatus] | None = None
+    impact: list[Impact] | None = None
+    limit: int = Field(default=20, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+    model_config = {
+        "extra": "forbid",
+    }
+
+class CountIssuesArgs(BaseModel):
+    stream: str = Field(..., min_length=1)
+    status: list[IssueStatus] | None = None
+    impact: list[Impact] | None = None
+    model_config = {
+        "extra": "forbid",
+    }
+
+class TopIssuesArgs(BaseModel):
+    stream: str = Field(..., min_length=1)
+    status: list[IssueStatus] | None = None
+    impact: list[Impact] | None = None
+    limit: int = Field(default=20, ge=1, le=200)
+    model_config = {
+        "extra": "forbid",
+    }
 
 class GatewayTools:
     def __init__(self) -> None:
@@ -12,7 +47,7 @@ class GatewayTools:
             max_connections=20,
             max_keepalive_connections=10,
         )
-        
+
         self._client = httpx.AsyncClient(
             base_url=settings.gateway_base_url.rstrip("/"),
             timeout=30.0,
@@ -30,8 +65,8 @@ class GatewayTools:
     async def search_issues(
         self,
         stream: str,
-        status: list[str] | None = None,
-        impact: list[str] | None = None,
+        status: list[IssueStatus] | None = None,
+        impact: list[Impact] | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -89,103 +124,68 @@ class GatewayTools:
         return res.json()
 
 
+def tool_schema(name: str, description: str, model: type[BaseModel]) -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": model.model_json_schema(),
+        },
+    }
+
 TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_streams",
-            "description": "List available Coverity streams that the agent can access.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_issues",
-            "description": "Search Coverity issues within a stream using status, impact, limit, and offset filters.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "stream": {"type": "string"},
-                    "status": {"type": "array", "items": {"type": "string"}},
-                    "impact": {"type": "array", "items": {"type": "string"}},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
-                    "offset": {"type": "integer", "minimum": 0},
-                },
-                "required": ["stream"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "count_issues",
-            "description": "Count Coverity issues within a stream using status and impact filters.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "stream": {"type": "string"},
-                    "status": {"type": "array", "items": {"type": "string"}},
-                    "impact": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["stream"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "top_issues",
-            "description": "Return a top slice of Coverity issues within a stream using status, impact, and limit filters.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "stream": {"type": "string"},
-                    "status": {"type": "array", "items": {"type": "string"}},
-                    "impact": {"type": "array", "items": {"type": "string"}},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
-                },
-                "required": ["stream"],
-                "additionalProperties": False,
-            },
-        },
-    },
+    tool_schema("list_streams", "List all available Coverity streams that the agent can access", ListStreamsArgs),
+    tool_schema("search_issues", "Search Coverity issues within a stream using status, impact, limit, and offset filters", SearchIssuesArgs),
+    tool_schema("count_issues", "Count Coverity issues within a stream using status and impact filters", CountIssuesArgs),
+    tool_schema("top_issues", "Get top Coverity issues within a stream using status, impact and limit filters", TopIssuesArgs),
 ]
 
+TOOL_ARG_MODELS: dict[str, type[BaseModel]] = {
+    "list_streams": ListStreamsArgs,
+    "search_issues": SearchIssuesArgs,
+    "count_issues": CountIssuesArgs,
+    "top_issues": TopIssuesArgs,
+}
 
-async def execute_tool(tools: GatewayTools, name: str, arguments_json: str) -> tuple[dict[str, Any], dict[str, Any]]:
+async def execute_tool(
+    tools: GatewayTools,
+    name: str,
+    arguments_json: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
-        args = json.loads(arguments_json or "{}")
+        raw_args = json.loads(arguments_json or "{}")
     except json.JSONDecodeError as exc:
         result = {"ok": False, "error": f"Invalid tool arguments JSON: {exc}"}
         return {"name": name, "arguments": arguments_json, "result": result}, result
 
     fn = getattr(tools, name, None)
-    if fn is None:
-        result = {"ok": False, "error": f"Unknown tool: {name}"}
-        return {"name": name, "arguments": args, "result": result}, result
+    model_cls = TOOL_ARG_MODELS.get(name)
+
+    if fn is None or model_cls is None:
+        result = {
+            "ok": False,
+            "error": f"Unknown tool: {name}",
+            "available_tools": sorted(TOOL_ARG_MODELS.keys()),
+        }
+        return {"name": name, "arguments": raw_args, "result": result}, result
 
     try:
-        result = await fn(**args)
-        return {"name": name, "arguments": args, "result": result}, result
+        validated = model_cls.model_validate(raw_args)
+        result = await fn(**validated.model_dump(exclude_none=True))
+        return {"name": name, "arguments": validated.model_dump(), "result": result}, result
     except httpx.HTTPStatusError as exc:
-        payload: Any
         try:
             payload = exc.response.json()
         except Exception:
             payload = exc.response.text
+
         result = {
             "ok": False,
             "error": f"Gateway returned HTTP {exc.response.status_code}",
             "details": payload,
         }
-        return {"name": name, "arguments": args, "result": result}, result
+        return {"name": name, "arguments": raw_args, "result": result}, result
     except Exception as exc:
         result = {"ok": False, "error": str(exc)}
-        return {"name": name, "arguments": args, "result": result}, result
+        return {"name": name, "arguments": raw_args, "result": result}, result
