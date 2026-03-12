@@ -28,10 +28,10 @@ def map_issue_row_to_summary(row: dict) -> IssueSummary:
         checker=row.get("checker"),
         impact=row.get("displayImpact"),
         status=row.get("status"),
-        file=row.get("displayFile") or row.get("file"),
-        function=row.get("displayFunction") or row.get("function"),
-        first_detected=row.get("displayFirstDetected") or row.get("firstDetected"),
-        last_detected=row.get("displayLastDetected") or row.get("lastDetected"),
+        file=row.get("displayFile"),
+        function=row.get("displayFunction"),
+        first_detected= row.get("firstDetected"),
+        last_detected=row.get("lastDetected"),
         message=row.get("displayType") or row.get("message") or row.get("summary"),
     )
 
@@ -75,10 +75,10 @@ async def issues_top(req: IssuesTopRequest, request: Request):
                     checker=row.get("checker"),
                     impact=row.get("displayImpact"),
                     status=row.get("status"),
-                    file=row.get("displayFile") or row.get("file"),
-                    function=row.get("displayFunction") or row.get("function"),
-                    first_detected=row.get("displayFirstDetected") or row.get("firstDetected"),
-                    last_detected=row.get("displayLastDetected") or row.get("lastDetected"),
+                    file=row.get("displayFile"),
+                    function=row.get("displayFunction"),
+                    first_detected=row.get("firstDetected"),
+                    last_detected=row.get("lastDetected"),
                     message=row.get("displayType") or row.get("message") or row.get("summary"),
                 )
             )

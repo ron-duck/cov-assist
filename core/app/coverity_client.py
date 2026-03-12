@@ -87,8 +87,8 @@ class CoverityClient:
                 "displayType",
                 "displayFile",
                 "displayFunction",
-                "displayFirstDetected",
-                "displayLastDetected",
+                "firstDetected",
+                "lastDetected",
             ]
 
         requested = [c for c in preferred_columns if c in cols_map]
