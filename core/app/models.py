@@ -26,7 +26,7 @@ class IssueSummary(BaseModel):
     function: str | None = None
     first_detected: str | None = None
     last_detected: str | None = None
-    message: str | None = None
+    issue_type: str | None = None
 
 class IssuesTopResponse(BaseModel):
     stream: str
