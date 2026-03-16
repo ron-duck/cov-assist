@@ -10,6 +10,7 @@ import {
   IssuesTopSchema,
   IssuesCountSchema,
   IssuesSearchSchema,
+  IssueDetailsSchema,
   normalizeStreamName
 } from "./validate.js";
 
@@ -165,6 +166,34 @@ app.post("/issues/search", { preHandler: requireApiKey }, async (req, reply) => 
       offset: payload.offset,
       impact: payload.impact,
       status: payload.status
+    }
+  });
+});
+
+app.post("/issues/details", { preHandler: requireApiKey }, async (req, reply) => {
+  const parsed = IssueDetailsSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    reply.code(400).send({ ok: false, error: "Invalid request", details: parsed.error.flatten() });
+    return;
+  }
+  
+  const payload = parsed.data;
+  const stream = normalizeStreamName(payload.stream);
+
+  if (!enforceStreamPolicy(req, reply, stream)) return;
+  
+  const url = `${config.coreBaseUrl}/issues/details`;
+
+  await proxyToCore(req, reply, {
+    method: "POST",
+    url,
+    body: { 
+      cid: payload.cid, 
+      stream },
+    auditAction: "issue_details",
+    auditMeta: {
+      cid: payload.cid,
+      stream,
     }
   });
 });

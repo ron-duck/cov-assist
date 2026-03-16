@@ -5,6 +5,8 @@ from typing import Any, Iterable
 
 import httpx
 
+from .models import IssueDetailsResponse,IssueOccurrenceDetails,IssueDetailsEvent
+
 from .config import settings
 
 
@@ -209,3 +211,45 @@ class CoverityClient:
             by_snapshot=True,
             snapshot_scope_show="last()",
         )
+    
+    async def get_issue_details(self, cid: str, stream: str) -> IssueDetailsResponse:
+        params = {
+            "cid": cid,
+            "streamName": stream,
+            "includeIssueOccurrences": True,
+            "includeTotalIssueOccurrencesCount": True
+        }
+        resp = await self._client.get("/issues/sourceCodeInfo",
+                                      params=params
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        occurrences_data = []
+
+        for occurrences in data.get("issueOccurrences", []):
+            events_data = []
+            for event in occurrences.get("events", []):
+                file_info = event.get("file", {})
+                events_data.append(IssueDetailsEvent(
+                    event_number=event.get("eventNumber"),
+                    event_description=event.get("eventDescription"),
+                    file=file_info.get("filePathname"),
+                    line_number=event.get("lineNumber")
+                ))
+            occurrences_data.append(
+                IssueOccurrenceDetails(
+                    occurrence_id=occurrences.get("id"),
+                    description=occurrences.get("description"),
+                    long_description=occurrences.get("longDescription"),
+                    local_effect=occurrences.get("localEffect"),
+                    events=events_data
+                ))
+
+        return IssueDetailsResponse(
+            cid=cid,
+            occurrences=occurrences_data,
+            occurrences_count=data.get("issueOccurrencesCount", 0)
+            )   
+
+        raise ValueError("Unexpected /issues/sourceCodeInfo response shape")

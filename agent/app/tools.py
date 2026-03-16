@@ -41,6 +41,13 @@ class TopIssuesArgs(BaseModel):
         "extra": "forbid",
     }
 
+class IssueDetailsArgs(BaseModel):
+    cid: str = Field(..., min_length=1)
+    stream: str = Field(..., min_length=1)
+    model_config = {
+        "extra": "forbid",
+    }
+
 class GatewayTools:
     def __init__(self) -> None:
         limits = httpx.Limits(
@@ -123,6 +130,20 @@ class GatewayTools:
         res.raise_for_status()
         return res.json()
 
+    async def get_issue_details(
+            self, 
+            cid: str, 
+            stream: str
+    ) -> dict[str, Any]:
+        payload = {
+            "cid": cid,
+            "stream": stream,
+        }
+
+        res = await self._client.post("/issues/details", json=payload)
+        res.raise_for_status()
+        return res.json()
+    
 
 def tool_schema(name: str, description: str, model: type[BaseModel]) -> dict[str, Any]:
     return {
@@ -139,6 +160,7 @@ TOOL_SCHEMAS = [
     tool_schema("search_issues", "Search Coverity issues within a stream using status, impact, limit, and offset filters", SearchIssuesArgs),
     tool_schema("count_issues", "Count Coverity issues within a stream using status and impact filters", CountIssuesArgs),
     tool_schema("top_issues", "Get top Coverity issues within a stream using status, impact and limit filters", TopIssuesArgs),
+    tool_schema("get_issue_details", "Get detailed information about a specific Coverity issue by CID and stream", IssueDetailsArgs),
 ]
 
 TOOL_ARG_MODELS: dict[str, type[BaseModel]] = {
@@ -146,6 +168,7 @@ TOOL_ARG_MODELS: dict[str, type[BaseModel]] = {
     "search_issues": SearchIssuesArgs,
     "count_issues": CountIssuesArgs,
     "top_issues": TopIssuesArgs,
+    "get_issue_details": IssueDetailsArgs,
 }
 
 async def execute_tool(

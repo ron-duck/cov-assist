@@ -10,6 +10,10 @@ from .models import (
     AppliedIssueFilters,
     IssuesSearchRequest,
     IssuesSearchResponse,
+    IssueDetailsRequest,
+    IssueDetailsResponse,
+    IssueOccurrenceDetails,
+    IssueDetailsEvent,
 )
 from .coverity_client import CoverityClient
 
@@ -32,7 +36,7 @@ def map_issue_row_to_summary(row: dict) -> IssueSummary:
         function=row.get("displayFunction"),
         first_detected= row.get("firstDetected"),
         last_detected=row.get("lastDetected"),
-        message=row.get("displayType") or row.get("message") or row.get("summary"),
+        issue_type=row.get("displayType") or row.get("message") or row.get("summary"),
     )
 
 @router.get("/health", response_model=dict)
@@ -79,7 +83,7 @@ async def issues_top(req: IssuesTopRequest, request: Request):
                     function=row.get("displayFunction"),
                     first_detected=row.get("firstDetected"),
                     last_detected=row.get("lastDetected"),
-                    message=row.get("displayType") or row.get("message") or row.get("summary"),
+                    issue_type=row.get("displayType"),
                 )
             )
 
@@ -162,3 +166,17 @@ async def issues_search(req: IssuesSearchRequest, request: Request):
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Coverity issues search query failed: {e}")
+    
+@router.post("/issues/details", response_model=IssueDetailsResponse)
+async def issue_details(req: IssueDetailsRequest, request: Request):
+    client = get_coverity_client(request)
+    try:
+        details = await client.get_issue_details(cid=req.cid, stream=req.stream)
+        return details
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Coverity HTTP error: {e.response.status_code} {e.response.text[:500]}",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Coverity issue details query failed: {e}")

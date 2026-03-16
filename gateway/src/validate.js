@@ -21,6 +21,11 @@ export const IssuesSearchSchema = z.object({
   offset: z.number().int().min(0).default(0)
 });
 
+export const IssueDetailsSchema = z.object({
+  cid: z.string().min(1),
+  stream: z.string().min(1).max(200)
+});
+
 export function normalizeStreamName(s) {
   return s.trim();
 }

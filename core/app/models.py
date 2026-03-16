@@ -60,3 +60,25 @@ class IssuesSearchResponse(BaseModel):
     total_returned: int
     filters: AppliedIssueFilters
     issues: list[IssueSummary]
+
+class IssueDetailsEvent(BaseModel):
+    event_number: str | None = None
+    event_description: str | None = None
+    file: str | None = None
+    line_number: str | None = None
+
+class IssueOccurrenceDetails(BaseModel):
+    occurrence_id: str | None = None
+    description: str | None = None
+    long_description: str | None = None
+    local_effect: str | None = None
+    events: list[IssueDetailsEvent] = Field(default_factory=list)
+
+class IssueDetailsRequest(BaseModel):
+    stream: str = Field(..., min_length=1)
+    cid: str = Field(..., min_length=1)
+
+class IssueDetailsResponse(BaseModel):
+    cid: str = Field(..., min_length=1)
+    occurrences: list[IssueOccurrenceDetails] = Field(default_factory=list)
+    occurrences_count: int = 0
