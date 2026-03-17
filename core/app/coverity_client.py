@@ -224,6 +224,8 @@ class CoverityClient:
         )
         resp.raise_for_status()
         data = resp.json()
+        if not isinstance(data, dict):
+            raise ValueError("Unexpected /issues/sourceCodeInfo response shape")
 
         occurrences_data = []
 
@@ -252,4 +254,4 @@ class CoverityClient:
             occurrences_count=data.get("issueOccurrencesCount", 0)
             )   
 
-        raise ValueError("Unexpected /issues/sourceCodeInfo response shape")
+        
