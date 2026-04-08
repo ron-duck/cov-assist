@@ -12,8 +12,8 @@ from .models import (
     IssuesSearchResponse,
     IssueDetailsRequest,
     IssueDetailsResponse,
-    IssueOccurrenceDetails,
-    IssueDetailsEvent,
+#    IssueOccurrenceDetails,
+#    IssueDetailsEvent,
 )
 from .coverity_client import CoverityClient
 

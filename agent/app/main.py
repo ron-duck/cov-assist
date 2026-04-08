@@ -3,18 +3,24 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
+import uuid
 import uvicorn
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 
 from .config import settings
 from .llm import LlmClient, SYSTEM_PROMPT
-from .models import AskRequest, AskResponse, HealthResponse
+from .models import AskRequest, AskResponse, HealthResponse, SessionState, ConversationTurn, ToolCallRecord 
 from .tools import GatewayTools, TOOL_SCHEMAS, execute_tool
 
 
 logger = logging.getLogger(__name__)
+sessions: dict[str, SessionState] = {}
 
+def get_or_create_session(session_id: str) -> SessionState:
+    if session_id not in sessions:
+        sessions[session_id] = SessionState(session_id=session_id)
+    return sessions[session_id]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,6 +51,8 @@ async def health() -> HealthResponse:
 
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest, request: Request) -> AskResponse:
+    session_id = req.session_id or str(uuid.uuid4())
+    state = get_or_create_session(session_id)
     llm = get_llm_client(request)
     tools = get_gateway_tools(request)
 
