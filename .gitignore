@@ -37,3 +37,4 @@ signal_errors.json
 .bridge/polaris_status_provider/2026_Mar_13_11.23.30-stdout
 .bridge/polaris_waiter/2026_Mar_13_11.22.46-stderr
 .bridge/polaris_waiter/2026_Mar_13_11.22.46-stdout
+.codesight/scan_results/rapid-scan-static-sast.json

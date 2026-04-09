@@ -60,7 +60,7 @@ async def ask(req: AskRequest, request: Request) -> AskResponse:
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": req.question},
     ]
-    tool_log: list[dict[str, Any]] = []
+    tool_log: list[ToolCallRecord] = []
 
     for _ in range(settings.llm_max_tool_round_trips):
         try:
@@ -83,6 +83,21 @@ async def ask(req: AskRequest, request: Request) -> AskResponse:
 
         if not tool_calls:
             answer = message.get("content") or "I could not produce an answer."
+            turn = ConversationTurn(question=req.question, answer=answer, tool_calls=tool_log)
+            state.recent_turns.append(turn)
+            state.recent_turns = state.recent_turns[-10:]
+            for call in tool_log:
+                if call.tool_call_id:
+                    args = call.arguments or {}
+
+                    stream = args.get("stream")
+                    if isinstance(stream, str) and stream.strip():
+                        state.last_stream = stream
+
+                    cid = args.get("cid")
+                    if isinstance(cid, str) and cid.strip():
+                        state.last_cid = cid
+
             return AskResponse(answer=answer, tool_calls=tool_log)
 
         for tool_call in tool_calls:
@@ -90,8 +105,9 @@ async def ask(req: AskRequest, request: Request) -> AskResponse:
             tool_name = fn.get("name")
             tool_args = fn.get("arguments", "{}")
             log_entry, result = await execute_tool(tools, tool_name, tool_args)
-            log_entry["id"] = tool_call.get("id")
-            tool_log.append(log_entry)
+            #log_entry["id"] = tool_call.get("id")
+            log_entry.tool_call_id = tool_call.get("id")
+            tool_log.append(log_entry)            
             messages.append(
                 {
                     "role": "tool",

@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 from .config import settings
 
+from .models import ToolCallRecord
+
 IssueStatus = Literal["Fixed", "Dismissed", "Triaged", "New"]
 Impact = Literal["Audit","Low", "Medium", "High"]
 
@@ -175,12 +177,12 @@ async def execute_tool(
     tools: GatewayTools,
     name: str,
     arguments_json: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[ToolCallRecord, dict[str, Any]]:
     try:
         raw_args = json.loads(arguments_json or "{}")
     except json.JSONDecodeError as exc:
         result = {"ok": False, "error": f"Invalid tool arguments JSON: {exc}"}
-        return {"name": name, "arguments": arguments_json, "result": result}, result
+        return ToolCallRecord(tool_name=name, arguments=arguments_json, result=result), result
 
     fn = getattr(tools, name, None)
     model_cls = TOOL_ARG_MODELS.get(name)
@@ -191,12 +193,12 @@ async def execute_tool(
             "error": f"Unknown tool: {name}",
             "available_tools": sorted(TOOL_ARG_MODELS.keys()),
         }
-        return {"name": name, "arguments": raw_args, "result": result}, result
+        return ToolCallRecord(tool_name=name, arguments=arguments_json, result=result), result
 
     try:
         validated = model_cls.model_validate(raw_args)
         result = await fn(**validated.model_dump(exclude_none=True))
-        return {"name": name, "arguments": validated.model_dump(), "result": result}, result
+        return ToolCallRecord(tool_name=name, arguments=arguments_json, result=result), result
     except httpx.HTTPStatusError as exc:
         try:
             payload = exc.response.json()
@@ -208,7 +210,7 @@ async def execute_tool(
             "error": f"Gateway returned HTTP {exc.response.status_code}",
             "details": payload,
         }
-        return {"name": name, "arguments": raw_args, "result": result}, result
+        return ToolCallRecord(tool_name=name, arguments=arguments_json, result=result), result
     except Exception as exc:
         result = {"ok": False, "error": str(exc)}
-        return {"name": name, "arguments": raw_args, "result": result}, result
+        return ToolCallRecord(tool_name=name, arguments=arguments_json, result=result), result
